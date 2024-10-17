@@ -6,6 +6,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  background-color: rgba(9, 9, 10);
 }
 canvas {
   display: block;
