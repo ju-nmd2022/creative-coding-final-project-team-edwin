@@ -1,5 +1,6 @@
 let handPose;
 let bodyPose;
+
 let video;
 let poses = [];
 let connections;
@@ -10,13 +11,16 @@ let timeDuration;
 let angleGrid = [];
 let fadeTimerGrid = [];
 let emotions = ["neutral"];
+let ah = 0;
+let na = 0;
+let sc = 0;
 
 function preload() {
   handPose = ml5.handPose();
   bodyPose = ml5.bodyPose();
 }
 
-const cellSize = 20;
+const cellSize = 10;
 let row;
 let col;
 
@@ -76,15 +80,93 @@ function setup() {
     timeDuration = random(200, 300);
   }
 }
+function countEmotions() {
+  let emotionCounts = {};
+
+  for (let i = 0; i < emotions.length; i++) {
+    let emotion = emotions[i];
+    if (emotionCounts[emotion]) {
+      emotionCounts[emotion]++;
+    } else {
+      emotionCounts[emotion] = 1;
+    }
+  }
+
+  let neutral = emotionCounts["neutral"] || 0;
+  let angry = emotionCounts["angry"] || 0;
+  let calm = emotionCounts["calm"] || 0;
+  let suprised = emotionCounts["surprised"] || 0;
+  let anxiety = emotionCounts["anxiety"] || 0;
+  let happy = emotionCounts["happy"] || 0;
+
+  neutral = neutral - random(0,2);
+  angry = angry - random(0,2);
+  calm = calm - random(0,2);
+  suprised = suprised - random(0,2);
+  anxiety = anxiety - random(0,2);
+  happy = happy - random(0,2);
+  if(neutral < 0){
+    neutral = 0;
+  }
+
+let na = neutral/anxiety;
+let ah = angry/happy;
+let sc = suprised/calm;
+console.log("na",na);
+console.log("ah",ah);
+console.log("sc",sc);
+
+
+
+  
+}
+
 function emotionHandling() {
+  
   for (let i = 0; i < poses.length; i++) {
     let pose = poses[i];
+    if (hands.length > 0) {
+      for (let h = 0; h < hands.length; h++) {
+        let hand = hands[h];
+
+        if (hand.keypoints[4].x < hand.keypoints[0].x && hand.keypoints[8].y < hand.keypoints[0].y) {
+          emotions.push("angry");
+          console.log(emotions);
+
+        }
+        if (hand.keypoints[4].x > hand.keypoints[8].x) {
+          emotions.push("calm");
+          console.log(emotions);
+
+        }
+        if (hand.keypoints[4].y < hand.keypoints[3].y && 
+            hand.keypoints[8].y > hand.keypoints[6].y &&  
+            hand.keypoints[12].y > hand.keypoints[10].y && 
+            hand.keypoints[16].y > hand.keypoints[14].y &&
+            hand.keypoints[20].y > hand.keypoints[18].y) {
+          emotions.push("happy");
+          console.log("happy detected (thumbs up)");
+        }
+      }
+      countEmotions();
+
+    }
 
     if (pose.keypoints[9].x < pose.keypoints[10].x) {
       emotions.push("angry");
       console.log(emotions);
     }
+    if (pose.keypoints[9].y && pose.keypoints[10].y < pose.keypoints[3].y) {
+      emotions.push("surprised");
+      console.log(emotions);
+    }else{
+      emotions.push("neutral");
+    }
+if(poses.length >= 1 && random(0,1) > 0.7)
+    emotions.push("anxiety")
   }
+  
+  
   //console.log(emotions);
 }
 
@@ -92,6 +174,7 @@ function draw() {
   background(10, 10, 10, 50);
   timer += deltaTime;
   noStroke();
+  emotionHandling();
   neighbors();
 
   let colors = {
@@ -120,20 +203,20 @@ function draw() {
       let dotX = centerX + cos(angleGrid[i][j]) * orbitRadius;
       let dotY = centerY + sin(angleGrid[i][j]) * orbitRadius;
 
-      fadeTimerGrid[i][j] = constrain(
-        fadeTimerGrid[i][j] + deltaTime / 2000,
-        0,
-        1
-      );
-      let blendedColor = lerpColor(
-        colors[prevState],
-        colors[state],
-        fadeTimerGrid[i][j]
-      );
+      // fadeTimerGrid[i][j] = constrain(
+      //   fadeTimerGrid[i][j] + deltaTime / 2000,
+      //   0,
+      //   1
+      // );
+      // let blendedColor = lerpColor(
+      //   colors[prevState],
+      //   colors[state],
+      //   fadeTimerGrid[i][j]
+      // );
 
-      fill(blendedColor);
-      //rect(j * cellSize, i * cellSize, cellSize, cellSize);
-      ellipse(dotX, dotY, cellSize / 6, cellSize / 6);
+      fill(colors[state]);
+      rect(j * cellSize, i * cellSize, cellSize, cellSize);
+     // ellipse(dotX, dotY, cellSize / 6, cellSize / 6);
     }
   }
 
@@ -142,14 +225,19 @@ function draw() {
   textAlign(LEFT, TOP);
   text(`People detected: ${poses.length}`, 10, 10);
   pop();
-  emotionHandling();
+  
 }
 
 function neighbors() {
+  
   if (timer > timeDuration) {
     let newGrid = [];
     let changeOccurred = false;
 
+    let battlefieldModifier = constrain(ah, 0.1, 2); // Affects battlefield chance, scaled by ah
+    let villageModifier = constrain(na, 0.1, 2); // Affects village chance, scaled by na
+    let churchModifier = constrain(sc, 0.1, 2); // Affects church chance, scaled by sc
+console.log("neighbors",battlefieldModifier );
     for (let i = 0; i < row; i++) {
       newGrid[i] = [];
       for (let j = 0; j < col; j++) {
@@ -176,53 +264,48 @@ function neighbors() {
 
         let battlefieldh = (me === 0 || me === 1) && left === 4 && right === 4;
         let battlefieldv = (me === 0 || me === 1) && above === 4 && under === 4;
-        let battlefieldChance = random() < 0.01;
-        let churchChance = random() < 0.01;
+
+        let battlefieldChance = random() < 0.01 * battlefieldModifier;
+        let churchChance = random() < 0.01 * churchModifier;
 
         if (
           (natrualVillagesh || natrualVillagesv) &&
           !changeOccurred &&
           !(lastChangedCell.row === i && lastChangedCell.col === j)
         ) {
-          if (left === 0 && left2 === 1) {
-            grid[i][(j - 1 + col) % col] = 4;
-            grid[i][(j - 2 + col) % col] = 0;
-          } else if (right === 0 && right2 === 1) {
-            grid[i][(j + 1) % col] = 4;
-            grid[i][(j + 2) % col] = 0;
-          } else if (above === 1 && above2 === 1) {
-            grid[(i - 1 + row) % row][j] = 4;
-            grid[(i - 2 + row) % row][j] = 0;
-          } else {
-            grid[(i + 1) % row][j] = 4;
-            grid[(i + 2) % row][j] = 0;
+          if (random() < 0.05 * villageModifier) { // Increase chance of village based on na
+            if (left === 0 && left2 === 1) {
+              grid[i][(j - 1 + col) % col] = 4;
+              grid[i][(j - 2 + col) % col] = 0;
+            } else if (right === 0 && right2 === 1) {
+              grid[i][(j + 1) % col] = 4;
+              grid[i][(j + 2) % col] = 0;
+            } else if (above === 1 && above2 === 1) {
+              grid[(i - 1 + row) % row][j] = 4;
+              grid[(i - 2 + row) % row][j] = 0;
+            } else {
+              grid[(i + 1) % row][j] = 4;
+              grid[(i + 2) % row][j] = 0;
+            }
+            newGrid[i][j] = 4;
+            lastChangedCell = { row: i, col: j };
+            changeOccurred = true;
           }
-
-          newGrid[i][j] = 4;
-          lastChangedCell = { row: i, col: j };
-          changeOccurred = true;
         } else {
           newGrid[i][j] = me;
         }
+
         if ((battlefieldh || battlefieldv) && battlefieldChance) {
           newGrid[i][j] = 5;
           lastChangedCell = { row: i, col: j };
           changeOccurred = true;
         }
+
         if (grid[i][j] === 5 && battlefieldChance) {
           grid[i][(j - 1 + col) % col] = 0;
           grid[i][(j + 1) % col] = newGrid[i][j] = 4;
         }
-        if (
-          poses.length / random(0, 1) > 1000 &&
-          me === 4 &&
-          !changeOccurred &&
-          !(lastChangedCell.row === i && lastChangedCell.col === j)
-        ) {
-          newGrid[i][j] = 0;
-          lastChangedCell = { row: i, col: j };
-          changeOccurred = true;
-        }
+
         if (
           left === 4 &&
           left2 === 4 &&
@@ -236,6 +319,7 @@ function neighbors() {
         ) {
           newGrid[i][j] = 6;
         }
+
         if (left === 6 || right === 6) {
           newGrid[i][j] = 4;
         }
@@ -253,12 +337,15 @@ function neighbors() {
           grid[(i - 1 + row) % row][j] = 7;
           grid[(i + 1) % row][j] = 7;
         }
+
         if (
           me === 3 &&
           (above === 7 || under === 7 || right === 7 || left === 7)
         ) {
           newGrid[i][j] = 8;
         }
+
+        // Harbor upgrade logic
         if (
           me === 2 &&
           (above === 7 || under === 7 || right === 7 || left === 7)
@@ -275,6 +362,7 @@ function neighbors() {
     }
   }
 }
+
 
 function getHandsData(results) {
   hands = results;
