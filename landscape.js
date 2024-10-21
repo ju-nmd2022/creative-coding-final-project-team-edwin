@@ -106,9 +106,6 @@ function countEmotions() {
   anxiety = anxiety - random(0, 2);
   happy = happy - random(0, 2);
 
-  if (neutral < 0) {
-    neutral = 0;
-  }
   na = neutral / anxiety;
   ah = angry / happy;
   sc = surprised / calm;
@@ -360,7 +357,7 @@ function neighbors() {
     if (changeOccurred) {
       grid = newGrid;
       timer = 0;
-      timeDuration = random(50, 100);
+      timeDuration = random(100, 500);
     }
   }
 }
